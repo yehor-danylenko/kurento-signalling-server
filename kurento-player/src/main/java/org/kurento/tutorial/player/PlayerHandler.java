@@ -36,6 +36,10 @@ import org.kurento.client.VideoInfo;
 import org.kurento.client.WebRtcEndpoint;
 import org.kurento.commons.exception.KurentoException;
 import org.kurento.jsonrpc.JsonUtils;
+import org.kurento.client.RembParams;
+import org.kurento.client.MediaType;
+import java.util.Map;
+import org.kurento.client.Stats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -69,6 +73,7 @@ public class PlayerHandler extends TextWebSocketHandler {
   public void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
     JsonObject jsonMessage = gson.fromJson(message.getPayload(), JsonObject.class);
     String sessionId = session.getId();
+    System.out.println("Message received: " + jsonMessage);
     log.debug("Incoming message {} from sessionId", jsonMessage, sessionId);
 
     try {
@@ -112,8 +117,11 @@ public class PlayerHandler extends TextWebSocketHandler {
     final UserSession user = new UserSession();
     MediaPipeline pipeline = kurento.createMediaPipeline();
     user.setMediaPipeline(pipeline);
+    pipeline.setLatencyStats(true);
+
     WebRtcEndpoint webRtcEndpoint = new WebRtcEndpoint.Builder(pipeline).build();
     user.setWebRtcEndpoint(webRtcEndpoint);
+  
     String videourl = jsonMessage.get("videourl").getAsString();
     final PlayerEndpoint playerEndpoint = new PlayerEndpoint.Builder(pipeline, videourl).build();
     user.setPlayerEndpoint(playerEndpoint);
@@ -127,6 +135,7 @@ public class PlayerHandler extends TextWebSocketHandler {
 
       @Override
       public void onEvent(IceCandidateFoundEvent event) {
+        System.out.println("My candidate: " + JsonUtils.toJsonObject(event.getCandidate()));
         JsonObject response = new JsonObject();
         response.addProperty("id", "iceCandidate");
         response.add("candidate", JsonUtils.toJsonObject(event.getCandidate()));
@@ -155,7 +164,7 @@ public class PlayerHandler extends TextWebSocketHandler {
     webRtcEndpoint.addMediaStateChangedListener(new EventListener<MediaStateChangedEvent>() {
       @Override
       public void onEvent(MediaStateChangedEvent event) {
-
+        System.out.println("event happened: " + event.getClass().getName() + "," + event);
         if (event.getNewState() == MediaState.CONNECTED) {
           VideoInfo videoInfo = playerEndpoint.getVideoInfo();
 
@@ -271,6 +280,17 @@ public class PlayerHandler extends TextWebSocketHandler {
     if (user != null) {
       long position = user.getPlayerEndpoint().getPosition();
 
+      WebRtcEndpoint webRtc = user.getWebRtcEndpoint();
+      Map<String, Stats> statsMap = webRtc.getStats(MediaType.VIDEO);
+      for (Stats stats: statsMap.values()) {
+        if (stats instanceof org.kurento.client.RTCOutboundRTPStreamStats) {
+          org.kurento.client.RTCOutboundRTPStreamStats s = ((org.kurento.client.RTCOutboundRTPStreamStats) stats);
+          System.out.println("\tPackets sent: " + s.getPacketsSent() + "\n\tBytes sent: " 
+            + s.getBytesSent() + "\n\tTarget bitrate: " + s.getTargetBitrate() + "\n\tFraction lost: " + s.getFractionLost()
+             + "\n\tPackets lost: " + s.getPacketsLost() + "\n\tRemb: " + s.getRemb());
+        }
+      }
+
       JsonObject response = new JsonObject();
       response.addProperty("id", "position");
       response.addProperty("position", position);
@@ -287,6 +307,7 @@ public class PlayerHandler extends TextWebSocketHandler {
           new IceCandidate(jsonCandidate.get("candidate").getAsString(), jsonCandidate
               .get("sdpMid").getAsString(), jsonCandidate.get("sdpMLineIndex").getAsInt());
       user.getWebRtcEndpoint().addIceCandidate(candidate);
+      System.out.println("Their candidate: " + jsonMessage);
     }
   }
 

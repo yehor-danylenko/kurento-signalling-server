@@ -38,6 +38,7 @@ window.onbeforeunload = function() {
 ws.onmessage = function(message) {
 	var parsedMessage = JSON.parse(message.data);
 	console.info('Received message: ' + message.data);
+	console.info('wss://' + location.host + '/player');
 
 	switch (parsedMessage.id) {
 	case 'startResponse':
