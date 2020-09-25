@@ -121,6 +121,9 @@ public class PlayerHandler extends TextWebSocketHandler {
 
     WebRtcEndpoint webRtcEndpoint = new WebRtcEndpoint.Builder(pipeline).build();
     user.setWebRtcEndpoint(webRtcEndpoint);
+
+    webRtcEndpoint.setStunServerAddress("173.194.207.127");
+    webRtcEndpoint.setStunServerPort(19302);
   
     String videourl = jsonMessage.get("videourl").getAsString();
     final PlayerEndpoint playerEndpoint = new PlayerEndpoint.Builder(pipeline, videourl).build();
